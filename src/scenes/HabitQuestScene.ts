@@ -1,9 +1,8 @@
 import Phaser from 'phaser';
 import type { Habit } from '../models/Habit';
-import { completedToday } from '../models/Habit';
+import { completedForCurrentPeriod, currentPeriodEndUTC } from '../models/Habit';
 import type { Player } from '../models/Player';
 import type { Quest } from '../models/Quest';
-import { todayMidnightUTC } from '../models/Quest';
 import { calculateXPGain, streakMultiplier, levelFromTotalXP } from '../services/XPService';
 import { completeHabit } from '../services/HabitService';
 import { awardXP } from '../services/PlayerService';
@@ -43,9 +42,8 @@ export class HabitQuestScene extends Phaser.Scene {
 
     this.add.rectangle(0, 0, width, this.cameras.main.height, 0x0d0d1a).setOrigin(0);
 
-    // Header
     this.add
-      .text(cx, 36, '⚔ Daily Quests', {
+      .text(cx, 36, 'Active Quests', {
         fontSize: '24px',
         color: '#c4b5fd',
         fontFamily: 'monospace',
@@ -69,7 +67,6 @@ export class HabitQuestScene extends Phaser.Scene {
   // ---------------------------------------------------------------------------
 
   private habitsToQuests(habits: Habit[]): Quest[] {
-    const expiry = todayMidnightUTC();
     return habits.map((h) => ({
       id: h.id,
       habitId: h.id,
@@ -80,9 +77,9 @@ export class HabitQuestScene extends Phaser.Scene {
       streakMultiplier: streakMultiplier(h.currentStreak),
       finalXP: calculateXPGain(h.baseXP, h.currentStreak),
       currentStreak: h.currentStreak,
-      isCompleted: completedToday(h),
-      completedAt: completedToday(h) ? h.lastCompletedAt : null,
-      expiresAt: expiry,
+      isCompleted: completedForCurrentPeriod(h),
+      completedAt: completedForCurrentPeriod(h) ? h.lastCompletedAt : null,
+      expiresAt: currentPeriodEndUTC(h),
     }));
   }
 
@@ -94,7 +91,7 @@ export class HabitQuestScene extends Phaser.Scene {
 
     if (this.quests.length === 0) {
       this.add
-        .text(cx, 280, 'No habits yet.\nAdd some from the main menu!', {
+        .text(cx, 280, 'No habits yet.\nOpen Manage Habits to create quests.', {
           fontSize: '16px',
           color: '#6b7280',
           fontFamily: 'monospace',
@@ -208,6 +205,9 @@ export class HabitQuestScene extends Phaser.Scene {
       this.player = updatedPlayer;
       this.registry.set('player', updatedPlayer);
       quest.isCompleted = true;
+      quest.currentStreak = newStreak;
+      quest.completedAt = Date.now();
+      this.updateLocalHabit(habit.id, newStreak);
 
       // Visual feedback
       cardBg.clear();
@@ -224,6 +224,22 @@ export class HabitQuestScene extends Phaser.Scene {
       console.error('Failed to complete habit:', err);
       hitArea.setInteractive({ useHandCursor: true });
     }
+  }
+
+  private updateLocalHabit(habitId: string, newStreak: number): void {
+    const now = Date.now();
+    this.habits = this.habits.map((habit) => {
+      if (habit.id !== habitId) return habit;
+
+      return {
+        ...habit,
+        currentStreak: newStreak,
+        longestStreak: Math.max(newStreak, habit.longestStreak),
+        lastCompletedAt: now,
+        totalCompletions: habit.totalCompletions + 1,
+      };
+    });
+    this.registry.set('habits', this.habits);
   }
 
   // ---------------------------------------------------------------------------

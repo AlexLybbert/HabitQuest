@@ -8,7 +8,7 @@ import { levelFromTotalXP } from '../services/XPService';
  * Displays:
  *  - Player name, level, and XP progress bar
  *  - Navigation buttons: Play (→ HabitQuestScene), Dashboard (→ DashboardScene)
- *  - A "Manage Habits" button to open the habit editor overlay (future)
+ *  - A "Manage Habits" button to open the habit editor
  *
  * Receives player data via the scene registry key 'player'.
  */
@@ -25,6 +25,12 @@ export class MainMenuScene extends Phaser.Scene {
   }
 
   create(): void {
+    this.game.events.once('habitquest:data-ready', () => {
+      if (this.scene.isActive('MainMenuScene')) {
+        this.scene.restart();
+      }
+    });
+
     const { width, height } = this.cameras.main;
     const cx = width / 2;
 
@@ -61,9 +67,18 @@ export class MainMenuScene extends Phaser.Scene {
     });
 
     this.createButton(cx, 450, 'MANAGE HABITS', 0x065f46, () => {
-      // Placeholder — habit management UI to be wired in Week 1 Day 2–3
-      this.showToast('Habit editor coming soon!');
+      this.scene.start('ManageHabitsScene');
     });
+
+    if (this.player.id === 'guest') {
+      this.add
+        .text(cx, 525, 'Connecting to save data...', {
+          fontSize: '12px',
+          color: '#9ca3af',
+          fontFamily: 'monospace',
+        })
+        .setOrigin(0.5);
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -160,29 +175,6 @@ export class MainMenuScene extends Phaser.Scene {
       text.setScale(1);
     });
     btn.on('pointerdown', onClick);
-  }
-
-  private showToast(message: string): void {
-    const { width, height } = this.cameras.main;
-    const toast = this.add
-      .text(width / 2, height - 60, message, {
-        fontSize: '14px',
-        color: '#fbbf24',
-        fontFamily: 'monospace',
-        backgroundColor: '#1f2937',
-        padding: { x: 12, y: 8 },
-      })
-      .setOrigin(0.5)
-      .setAlpha(0);
-
-    this.tweens.add({
-      targets: toast,
-      alpha: { from: 0, to: 1 },
-      duration: 200,
-      yoyo: true,
-      hold: 1500,
-      onComplete: () => toast.destroy(),
-    });
   }
 
   private defaultPlayer(): Player {

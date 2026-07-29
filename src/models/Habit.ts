@@ -36,3 +36,41 @@ export function completedToday(habit: Habit): boolean {
     now.getUTCDate() === last.getUTCDate()
   );
 }
+
+/** Returns true if the habit has already been completed in its active period. */
+export function completedForCurrentPeriod(habit: Habit): boolean {
+  if (habit.frequency === 'weekly') {
+    return completedThisWeek(habit);
+  }
+  return completedToday(habit);
+}
+
+/** Returns true if the habit has already been completed this UTC week. */
+export function completedThisWeek(habit: Habit): boolean {
+  if (habit.lastCompletedAt === null) return false;
+
+  const nowStart = startOfUTCWeek(Date.now());
+  const lastStart = startOfUTCWeek(habit.lastCompletedAt);
+  return nowStart === lastStart;
+}
+
+/** Returns the UTC timestamp when the habit's current period expires. */
+export function currentPeriodEndUTC(habit: Habit): number {
+  if (habit.frequency === 'weekly') {
+    return startOfUTCWeek(Date.now()) + 7 * 24 * 60 * 60 * 1000;
+  }
+
+  const now = new Date();
+  return Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1);
+}
+
+function startOfUTCWeek(ts: number): number {
+  const date = new Date(ts);
+  const day = date.getUTCDay();
+  const daysSinceMonday = (day + 6) % 7;
+  return Date.UTC(
+    date.getUTCFullYear(),
+    date.getUTCMonth(),
+    date.getUTCDate() - daysSinceMonday
+  );
+}
